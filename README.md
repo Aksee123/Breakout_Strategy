@@ -1,73 +1,78 @@
-# 📈 AlphaTrend Auto Strategy
+# 🚀 Breakout Strategy with Custom TP & SL
 
-The **AlphaTrend Auto Strategy** is a precision-built Pine Script strategy for TradingView that combines ATR-based volatility modeling, RSI momentum filters, and customizable stop loss/take profit logic. Designed to help traders automate decisions while maintaining flexibility in risk control.
+This **Breakout Strategy** is an advanced Pine Script implementation for TradingView that identifies bullish and bearish breakouts based on swing highs/lows, enhanced by multiple filtering conditions including EMA, RSI, MACD, ATR, volume, and time-of-day controls.
 
----
-
-## ⚙️ Key Features
-
-- 📊 **Trend Filter**: RSI threshold integrated with ATR range detection
-- 📈 **Signal Generation**: Entry points triggered by crossover mechanics
-- 🎯 **Risk Management**:
-  - Optional fixed SL/TP mode
-  - Dynamic swing high/low based protection
-  - Selectable 1:1 risk-to-reward ratio mode
-
-- 🖥️ **Visual Aids**:
-  - Blue line: AlphaTrend adaptive filter
-  - Green triangle: Buy signal
-  - Red triangle: Sell signal
+It offers dynamic risk management tools, including fixed or swing-based stop-loss (SL), configurable take profit (TP), and optional 1:1 risk-to-reward logic. Ideal for traders seeking a configurable breakout engine with high-level control.
 
 ---
 
-## 🔍 Parameter Breakdown
+## 📈 Strategy Highlights
 
-| Parameter           | Description                                   |
-|---------------------|-----------------------------------------------|
-| `Multiplier`        | Controls ATR sensitivity                      |
-| `Common Period`     | RSI & ATR calculation period                  |
-| `Price Source`      | Data input for signal logic                   |
-| `Use Fixed SL/TP`   | Enables/disables percentage-based exits       |
-| `1:1 Risk to Reward`| Equalizes stop-loss and target distance       |
-| `SL / TP Percentage`| Fixed exit percent when static mode is on     |
+- ✅ **Breakout Logic**:
+  - Bullish breakout above recent swing high
+  - Bearish breakout below recent swing low
 
----
+- 🔒 **Risk Management**:
+  - Toggle between Swing SL or Fixed SL
+  - Optional 1:1 Risk-Reward mode
+  - TP can be disabled (set to zero) for swing-only exits
 
-## 📈 Trading Logic Overview
+- 🧠 **Filters & Enhancements**:
+  - EMA 233 trend direction filter
+  - ATR volatility filter
+  - Volume spike confirmation
+  - RSI threshold logic
+  - MACD confirmation (optional)
+  - Time/session filter for trade windows
 
-- **AlphaTrend Line**:
-  - RSI ≥ 50 → use lower threshold
-  - RSI < 50 → use upper threshold
-- **Buy** when price crosses **above** AlphaTrend
-- **Sell** when price crosses **below** AlphaTrend
-
-- **Stop Loss / Take Profit** adjusts depending on:
-  - Fixed vs. swing-based logic
-  - Optional equalized SL:TP distances
-
----
-
-## 🚀 Deployment Guide
-
-1. Open TradingView and head to Pine Editor
-2. Paste in the strategy script
-3. Save and add to your chart
-4. Fine-tune settings based on asset and timeframe
-5. Backtest performance using Strategy Tester
+- 📊 **Visuals**:
+  - SL/TP plotted with dotted lines and labels
+  - Breakout signals plotted with colored shapes
+  - MACD chart pane (optional)
 
 ---
 
-## 🧑‍💻 Author
+## ⚙️ Input Parameters
 
-Developed by [Rao Aksee Nasir] — AI automation & trading systems enthusiast building scalable portfolio tools.
+| Parameter            | Functionality                              |
+|----------------------|---------------------------------------------|
+| `Swing Window`       | Lookback period for breakout levels         |
+| `Trading Direction`  | Filters long/short entries                  |
+| `Take Profit (%)`    | TP target from entry price                  |
+| `Stop Loss Type`     | Swing or fixed percentage-based SL          |
+| `Fixed SL (%)`       | SL percentage (if using Fixed SL)           |
+| `Use 1:1 RR`         | TP equals SL for symmetrical exits          |
+| `Use EMA Filter`     | Trend confirmation based on EMA233          |
+| `Use ATR Filter`     | Volatility filter using ATR                 |
+| `Use Volume Filter`  | Confirms breakout with high volume          |
+| `Use Session Filter` | Restrict entries to specific hours          |
+| `Use RSI Filter`     | RSI confirmation logic                      |
+| `Use MACD Filter`    | Optional MACD signal filtering              |
 
 ---
-## 📝 License
 
-This strategy is open-source under the MIT License. Attribution is appreciated but not required.
+## 💡 Usage Instructions
+
+1. Copy the code into Pine Script editor on TradingView.
+2. Adjust parameters based on asset type and trading goals.
+3. Add to chart and toggle visualization options (MACD, labels, etc.).
+4. Backtest using Strategy Tester and refine SL/TP levels.
+5. Deploy across crypto, forex, or index pairs for adaptive performance.
 
 ---
 
-## 💬 Feedback & Contributions
+## 👨‍💻 Author
 
-Bug fixes, enhancements, or usage reports welcome! Submit issues or pull requests directly through GitHub.
+Created by [Rao Aksee Nasir](https://github.com/your-username), software engineer and automation strategist passionate about smart trading systems and global tech solutions.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. Free to fork, modify, and share with attribution.
+
+---
+
+## 📬 Contact & Contributions
+
+Pull requests and feedback welcome! Share performance metrics or report issues directly on GitHub.
