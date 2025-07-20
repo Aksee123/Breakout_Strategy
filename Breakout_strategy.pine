@@ -1,50 +1,144 @@
 //@version=5
-strategy("AlphaTrend Strategy", overlay=true)
+strategy("Breakout Strategy with Custom TP and SL", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
 
-// Parameters
-coeff = input.float(1, "Multiplier", step=0.1, group="AlphaTrend")
-AP = input(14, "Common Period", group="AlphaTrend")
-src = input(close, "Price Source", group="AlphaTrend")
-useFixedSLTP = input.bool(false, "Use Fixed SL/TP", group="Risk Management")
-riskToReward = input.bool(true, "1:1 Risk to Reward Ratio", group="Risk Management")
-slPerc = input.float(1.0, "SL Percentage", group="Risk Management")
-tpPerc = input.float(1.0, "TP Percentage", group="Risk Management")
+// Input parameters
+swingWindow = input.int(20, "Swing Window", minval=1, maxval=50)
+direction = input.string("both", "Trading Direction", options=["bullish", "bearish", "both"])
+tpPercent = input.float(1.0, "Take Profit (%)", minval=0.0, step=0.1, tooltip="Set 0 for no TP")
+slType = input.string("Swing SL", "Stop Loss Type", options=["Swing SL", "Fixed SL"])
+fixedSlPercent = input.float(1.0, "Fixed SL (%)", minval=0.0, step=0.1)
 
-// AlphaTrend Calculation
-ATR = ta.sma(ta.tr, AP)
-upT = low - ATR * coeff
-downT = high + ATR * coeff
-AlphaTrend = 0.0
-AlphaTrend := (ta.rsi(src, AP) >= 50 ? upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT)
+// === RISK-REWARD TOGGLE ===
+useRR1 = input.bool(false, "Use 1:1 Risk-Reward (TP = SL)")
 
-// Risk Management Calculation
-swingLow = ta.lowest(low, 10) // Swing low of last 10 periods
-swingHigh = ta.highest(high, 10) // Swing high of last 10 periods
-fixedSL = close * (1 - slPerc / 100)
-fixedTP = close * (1 + tpPerc / 100)
+// EMA filter
+useEMAFilter = input.bool(true, "Use 233 EMA Filter (Other Pairs)")
+useEMAFilterBTC = input.bool(true, "Use 233 EMA Filter (BTC Only)")
 
-longSL = useFixedSLTP ? fixedSL : swingLow
-longTP = riskToReward ? close + (close - longSL) : fixedTP
+// ATR filter
+useATRFilter = input.bool(false, "Use ATR Volatility Filter")
+atrPeriod = input.int(14, "ATR Period", group="ATR Filter")
+minAtr = input.float(0.5, "Min ATR (% of price)", step=0.1, group="ATR Filter")
+atr = ta.atr(atrPeriod)
+atrFilter = (atr / close) * 100 > minAtr
 
-shortSL = useFixedSLTP ? fixedSL : swingHigh
-shortTP = riskToReward ? close - (shortSL - close) : fixedTP
+// Volume filter
+useVolumeFilter = input.bool(false, "Use Volume Filter")
+volMultiplier = input.float(1.2, "Volume Multiplier", step=0.1, group="Volume Filter")
+volFilter = volume > ta.sma(volume, 20) * volMultiplier
 
-// Entry Conditions
-buySignal = ta.crossover(src, AlphaTrend)
-sellSignal = ta.crossunder(src, AlphaTrend)
+// Session filter
+useSessionFilter = input.bool(false, "Use Session/Time Filter")
+startHour = input.int(8, "Start Hour (UTC)", group="Session Filter")
+endHour = input.int(20, "End Hour (UTC)", group="Session Filter")
+inSession = (hour >= startHour and hour < endHour)
 
-// Strategy Execution
-if buySignal
+// RSI filter
+useRSIFilter = input.bool(false, "Use RSI Filter")
+rsiPeriod = input.int(14, "RSI Period", group="RSI Filter")
+rsi = ta.rsi(close, rsiPeriod)
+longRSI = rsi < 70
+shortRSI = rsi > 30
+
+// MACD filter
+useMACDFilter = input.bool(false, "Use MACD Filter")
+plotMACD = input.bool(false, "Plot MACD on Chart")
+macdFastLength = input.int(12, "MACD Fast Length", group="MACD Filter")
+macdSlowLength = input.int(26, "MACD Slow Length", group="MACD Filter")
+macdSignalLength = input.int(9, "MACD Signal Length", group="MACD Filter")
+[macdLine, signalLine, histLine] = ta.macd(close, macdFastLength, macdSlowLength, macdSignalLength)
+macdLongFilter = macdLine > 0 or macdLine > signalLine
+macdShortFilter = macdLine < 0 or macdLine < signalLine
+
+plot(plotMACD and useMACDFilter ? macdLine : na, "MACD Line", color=color.blue, linewidth=1, display=display.pane)
+plot(plotMACD and useMACDFilter ? signalLine : na, "Signal Line", color=color.orange, linewidth=1, display=display.pane)
+plot(plotMACD and useMACDFilter ? histLine : na, "Histogram", color=histLine >= 0 ? color.green : color.red, style=plot.style_histogram, linewidth=2, display=display.pane)
+
+highestHigh = ta.highest(high, swingWindow)
+lowestLow = ta.lowest(low, swingWindow)
+ema233 = ta.ema(close, 233)
+
+bullishBreakout = (close > highestHigh[1]) and (close[1] <= highestHigh[2])
+bearishBreakout = (close < lowestLow[1]) and (close[1] >= lowestLow[2])
+plot(highestHigh, "Swing High", color=color.new(color.blue, 70), linewidth=1)
+plot(lowestLow, "Swing Low", color=color.new(color.red, 70), linewidth=1)
+
+isBTC = syminfo.ticker == "BTCUSDT"
+emaFilterActive = (isBTC and useEMAFilterBTC) or (not isBTC and useEMAFilter)
+
+longCondition = bullishBreakout and (direction == "bullish" or direction == "both") and (not emaFilterActive or close > ema233) and (not useATRFilter or atrFilter) and (not useVolumeFilter or volFilter) and (not useSessionFilter or inSession) and (not useRSIFilter or longRSI) and (not useMACDFilter or macdLongFilter)
+shortCondition = bearishBreakout and (direction == "bearish" or direction == "both") and (not emaFilterActive or close < ema233) and (not useATRFilter or atrFilter) and (not useVolumeFilter or volFilter) and (not useSessionFilter or inSession) and (not useRSIFilter or shortRSI) and (not useMACDFilter or macdShortFilter)
+
+var float longEntryPrice = na
+var float shortEntryPrice = na
+if (longCondition)
+    longEntryPrice := close
+if (shortCondition)
+    shortEntryPrice := close
+
+float longTP = na
+float shortTP = na
+float longSL = na
+float shortSL = na
+// === RISK-REWARD LOGIC ===
+if (useRR1)
+    if (slType == "Swing SL")
+        if (not na(longEntryPrice))
+            longSL := lowestLow
+            longTP := longEntryPrice + math.abs(longEntryPrice - longSL)
+        if (not na(shortEntryPrice))
+            shortSL := highestHigh
+            shortTP := shortEntryPrice - math.abs(shortEntryPrice - shortSL)
+    else
+        if (not na(longEntryPrice))
+            longSL := longEntryPrice * (1 - fixedSlPercent / 100)
+            longTP := longEntryPrice * (1 + fixedSlPercent / 100)
+        if (not na(shortEntryPrice))
+            shortSL := shortEntryPrice * (1 + fixedSlPercent / 100)
+            shortTP := shortEntryPrice * (1 - fixedSlPercent / 100)
+else
+    if (slType == "Swing SL")
+        longSL := lowestLow
+        shortSL := highestHigh
+    else
+        if (not na(longEntryPrice))
+            longSL := longEntryPrice * (1 - fixedSlPercent / 100)
+        if (not na(shortEntryPrice))
+            shortSL := shortEntryPrice * (1 + fixedSlPercent / 100)
+    if (not na(longEntryPrice) and tpPercent > 0)
+        longTP := longEntryPrice * (1 + tpPercent / 100)
+    if (not na(shortEntryPrice) and tpPercent > 0)
+        shortTP := shortEntryPrice * (1 - tpPercent / 100)
+
+// === TRADE EXECUTION & SL/TP PLOTTING ===
+if (longCondition)
     strategy.entry("Long", strategy.long)
-    strategy.exit("Exit Long", "Long", stop=longSL, limit=longTP)
+    if (tpPercent > 0)
+        strategy.exit("Long Exit", from_entry="Long", stop=longSL, limit=longTP)
+    else
+        strategy.exit("Long SL", from_entry="Long", stop=longSL)
+    // Plot TP and SL lines and labels for Long
+    if (not na(longTP))
+        line.new(bar_index, longTP, bar_index+1, longTP, color=color.green, width=2, style=line.style_dotted)
+        label.new(bar_index, longTP, text="TP", color=color.green, style=label.style_label_down, textcolor=color.white)
+    if (not na(longSL))
+        line.new(bar_index, longSL, bar_index+1, longSL, color=color.red, width=2, style=line.style_dotted)
+        label.new(bar_index, longSL, text="SL", color=color.red, style=label.style_label_down, textcolor=color.white)
 
-if sellSignal
+if (shortCondition)
     strategy.entry("Short", strategy.short)
-    strategy.exit("Exit Short", "Short", stop=shortSL, limit=shortTP)
+    if (tpPercent > 0)
+        strategy.exit("Short Exit", from_entry="Short", stop=shortSL, limit=shortTP)
+    else
+        strategy.exit("Short SL", from_entry="Short", stop=shortSL)
+    // Plot TP and SL lines and labels for Short
+    if (not na(shortTP))
+        line.new(bar_index, shortTP, bar_index+1, shortTP, color=color.green, width=2, style=line.style_dotted)
+        label.new(bar_index, shortTP, text="TP", color=color.green, style=label.style_label_up, textcolor=color.white)
+    if (not na(shortSL))
+        line.new(bar_index, shortSL, bar_index+1, shortSL, color=color.red, width=2, style=line.style_dotted)
+        label.new(bar_index, shortSL, text="SL", color=color.red, style=label.style_label_up, textcolor=color.white)
 
-// Plotting
-plot(AlphaTrend, "AlphaTrend", color=color.blue, linewidth=2)
-plotshape(series=buySignal, location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small, title="Buy Signal")
-plotshape(series=sellSignal, location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small, title="Sell Signal")
-
-
+plotshape(longCondition, "Bullish Breakout", shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCondition, "Bearish Breakout", shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
+plot(ema233, "EMA 233", color=color.orange) 
