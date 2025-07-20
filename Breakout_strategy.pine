@@ -1,0 +1,50 @@
+//@version=5
+strategy("AlphaTrend Strategy", overlay=true)
+
+// Parameters
+coeff = input.float(1, "Multiplier", step=0.1, group="AlphaTrend")
+AP = input(14, "Common Period", group="AlphaTrend")
+src = input(close, "Price Source", group="AlphaTrend")
+useFixedSLTP = input.bool(false, "Use Fixed SL/TP", group="Risk Management")
+riskToReward = input.bool(true, "1:1 Risk to Reward Ratio", group="Risk Management")
+slPerc = input.float(1.0, "SL Percentage", group="Risk Management")
+tpPerc = input.float(1.0, "TP Percentage", group="Risk Management")
+
+// AlphaTrend Calculation
+ATR = ta.sma(ta.tr, AP)
+upT = low - ATR * coeff
+downT = high + ATR * coeff
+AlphaTrend = 0.0
+AlphaTrend := (ta.rsi(src, AP) >= 50 ? upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT)
+
+// Risk Management Calculation
+swingLow = ta.lowest(low, 10) // Swing low of last 10 periods
+swingHigh = ta.highest(high, 10) // Swing high of last 10 periods
+fixedSL = close * (1 - slPerc / 100)
+fixedTP = close * (1 + tpPerc / 100)
+
+longSL = useFixedSLTP ? fixedSL : swingLow
+longTP = riskToReward ? close + (close - longSL) : fixedTP
+
+shortSL = useFixedSLTP ? fixedSL : swingHigh
+shortTP = riskToReward ? close - (shortSL - close) : fixedTP
+
+// Entry Conditions
+buySignal = ta.crossover(src, AlphaTrend)
+sellSignal = ta.crossunder(src, AlphaTrend)
+
+// Strategy Execution
+if buySignal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=longSL, limit=longTP)
+
+if sellSignal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=shortSL, limit=shortTP)
+
+// Plotting
+plot(AlphaTrend, "AlphaTrend", color=color.blue, linewidth=2)
+plotshape(series=buySignal, location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small, title="Buy Signal")
+plotshape(series=sellSignal, location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small, title="Sell Signal")
+
+
